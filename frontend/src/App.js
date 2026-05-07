@@ -7,7 +7,7 @@ import NearbyServicesPanel from './components/NearbyServicesPanel';
 import LocationBar from './components/LocationBar';
 import './App.css';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API = process.env.REACT_APP_API_URL || 'https://roadsos-backend-9ch2.onrender.com';
 
 function generateSessionId() {
   return 'sess_' + Math.random().toString(36).slice(2) + Date.now();
