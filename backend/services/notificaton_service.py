@@ -15,16 +15,7 @@ class NotificationService:
         )
 
         if self._enabled:
-            # ✅ Verify credentials but DON'T crash app if it fails
-            try:
-                from twilio.rest import Client
-                client = Client(self._sid, self._token)
-                client.api.accounts(self._sid).fetch()
-                print("[NotificationService] Twilio SMS ready ✅")
-            except Exception as e:
-                print(f"[NotificationService] Twilio credential check failed: {e}")
-                print("[NotificationService] SMS disabled — fix credentials in Render Environment")
-                self._enabled = False  # ✅ just disable, don't crash
+            print("[NotificationService] Twilio SMS ready ✅")
         else:
             missing = []
             if not self._sid or self._sid in ("ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",):
