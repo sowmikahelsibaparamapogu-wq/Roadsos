@@ -127,8 +127,6 @@ const OSM_TAG_QUERIES = {
 };
 
 // ─── NAME-KEYWORD queries (catches Indian shops tagged only with a name) ─────
-// These find nodes/ways whose "name" tag contains common keywords.
-// Critically important for Indian cities where OSM tagging is sparse.
 const OSM_NAME_QUERIES = {
   police: (lat, lon, r) => `
     [out:json][timeout:25];
@@ -278,29 +276,20 @@ function parseElements(elements, type, userLat, userLon) {
   return places;
 }
 
-// ─── Single Overpass fetch helper ────────────────────────────────────────────
+// ─── FIXED: Single Overpass fetch via backend proxy (fixes CORS) ─────────────
 async function overpassFetch(query) {
-  // Try primary, fall back to mirror if it fails
-  const endpoints = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const resp = await fetch(url, {
-        method:  'POST',
-        body:    `data=${encodeURIComponent(query)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
-      if (!resp.ok) continue;
-      const json = await resp.json();
-      return json.elements || [];
-    } catch {
-      // try next endpoint
-    }
+  try {
+    const resp = await fetch('/api/overpass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!resp.ok) throw new Error(`Proxy error: ${resp.status}`);
+    const json = await resp.json();
+    return json.elements || [];
+  } catch (e) {
+    throw new Error('Overpass API unavailable. Check internet connection.');
   }
-  throw new Error('Overpass API unavailable. Check internet connection.');
 }
 
 // ─── Main fetch: runs TAG query + NAME query in parallel, merges results ─────
