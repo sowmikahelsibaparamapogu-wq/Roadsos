@@ -2,6 +2,7 @@
   "name": "roadsos-frontend",
   "version": "3.0.0",
   "private": true,
+  "homepage": "",
   "dependencies": {
     "axios": "^1.6.0",
     "react": "^18.2.0",
@@ -21,6 +22,5 @@
   "browserslist": {
     "production": [">0.2%", "not dead", "not op_mini all"],
     "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
-  },
-  "proxy": "https://roadsos-backend-9ch2.onrender.com"
+  }
 }
