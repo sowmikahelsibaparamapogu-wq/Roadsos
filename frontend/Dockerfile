@@ -9,7 +9,7 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Build args passed from docker-compose
-ARG REACT_APP_API_URL=http://localhost:8000
+ARG REACT_APP_API_URL=https://roadsos-backend-9ch2.onrender.com
 ARG REACT_APP_GOOGLE_MAPS_KEY=""
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV REACT_APP_GOOGLE_MAPS_KEY=$REACT_APP_GOOGLE_MAPS_KEY
