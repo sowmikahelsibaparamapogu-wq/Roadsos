@@ -50,16 +50,17 @@ const SERVICE_TYPES = [
 
 // Radius options in metres
 const RADIUS_OPTIONS = [
-  { label: '5 km',  value: 5000  },
-  { label: '10 km', value: 10000 },
-  { label: '25 km', value: 25000 },
-  { label: '50 km', value: 50000 },
-  { label: '100 km',value: 100000},
+  { label: '5 km',   value: 5000   },
+  { label: '10 km',  value: 10000  },
+  { label: '25 km',  value: 25000  },
+  { label: '50 km',  value: 50000  },
+  { label: '100 km', value: 100000 },
 ];
 
-const OSM_QUERIES = {
+// ─── TAG-BASED queries (standard OSM tagging) ───────────────────────────────
+const OSM_TAG_QUERIES = {
   police: (lat, lon, r) => `
-    [out:json][timeout:30];
+    [out:json][timeout:25];
     (
       node["amenity"="police"](around:${r},${lat},${lon});
       way["amenity"="police"](around:${r},${lat},${lon});
@@ -68,27 +69,27 @@ const OSM_QUERIES = {
     out center;`,
 
   hospital: (lat, lon, r) => `
-    [out:json][timeout:30];
+    [out:json][timeout:25];
     (
       node["amenity"="hospital"](around:${r},${lat},${lon});
       way["amenity"="hospital"](around:${r},${lat},${lon});
-      node["amenity"="clinic"](around:${Math.floor(r/2)},${lat},${lon});
+      node["amenity"="clinic"](around:${r},${lat},${lon});
+      way["amenity"="clinic"](around:${r},${lat},${lon});
+      node["amenity"="doctors"](around:${r},${lat},${lon});
       node["emergency"="ambulance_station"](around:${r},${lat},${lon});
       node["healthcare"="hospital"](around:${r},${lat},${lon});
       way["healthcare"="hospital"](around:${r},${lat},${lon});
+      node["healthcare"="clinic"](around:${r},${lat},${lon});
     );
     out center;`,
 
-  // FIXED: Much broader towing query covering all common OSM tagging patterns
   towing: (lat, lon, r) => `
-    [out:json][timeout:30];
+    [out:json][timeout:25];
     (
       node["service"~"towing|vehicle_rescue|breakdown"](around:${r},${lat},${lon});
       way["service"~"towing|vehicle_rescue|breakdown"](around:${r},${lat},${lon});
       node["amenity"="vehicle_rescue"](around:${r},${lat},${lon});
       node["emergency"="towing"](around:${r},${lat},${lon});
-      node["shop"="car_repair"]["service:towing"~"yes|emergency"](around:${r},${lat},${lon});
-      node["shop"="car_repair"]["towing"="yes"](around:${r},${lat},${lon});
       node["shop"="car_repair"](around:${r},${lat},${lon});
       way["shop"="car_repair"](around:${r},${lat},${lon});
       node["craft"="car_repair"](around:${r},${lat},${lon});
@@ -97,37 +98,75 @@ const OSM_QUERIES = {
     );
     out center;`,
 
-  // FIXED: Much broader puncture/tyre query — covers Indian, UK, US OSM tagging
   puncture: (lat, lon, r) => `
-    [out:json][timeout:30];
+    [out:json][timeout:25];
     (
       node["shop"="tyres"](around:${r},${lat},${lon});
       way["shop"="tyres"](around:${r},${lat},${lon});
       node["shop"="tyre"](around:${r},${lat},${lon});
-      way["shop"="tyre"](around:${r},${lat},${lon});
       node["shop"="tire"](around:${r},${lat},${lon});
-      way["shop"="tire"](around:${r},${lat},${lon});
       node["craft"="tyre_repairer"](around:${r},${lat},${lon});
-      node["repair"~"tyres|tyre|tire|tires|puncture"](around:${r},${lat},${lon});
-      node["service"~"tyres|tyre|tire|puncture"](around:${r},${lat},${lon});
-      node["shop"="car_repair"]["service:tyres"="yes"](around:${r},${lat},${lon});
-      node["shop"="car_repair"]["service:tyre_repair"="yes"](around:${r},${lat},${lon});
       node["shop"="car_repair"](around:${r},${lat},${lon});
       way["shop"="car_repair"](around:${r},${lat},${lon});
-      node["amenity"="car_repair"](around:${r},${lat},${lon});
       node["craft"="car_repair"](around:${r},${lat},${lon});
+      node["amenity"="car_repair"](around:${r},${lat},${lon});
     );
     out center;`,
 
   showroom: (lat, lon, r) => `
-    [out:json][timeout:30];
+    [out:json][timeout:25];
     (
       node["shop"="car"](around:${r},${lat},${lon});
-      node["shop"="motorcycle"](around:${r},${lat},${lon});
-      node["amenity"="car_rental"](around:${r},${lat},${lon});
       way["shop"="car"](around:${r},${lat},${lon});
+      node["shop"="motorcycle"](around:${r},${lat},${lon});
       way["shop"="motorcycle"](around:${r},${lat},${lon});
       node["shop"="car_parts"](around:${r},${lat},${lon});
+      node["amenity"="car_rental"](around:${r},${lat},${lon});
+    );
+    out center;`,
+};
+
+// ─── NAME-KEYWORD queries (catches Indian shops tagged only with a name) ─────
+// These find nodes/ways whose "name" tag contains common keywords.
+// Critically important for Indian cities where OSM tagging is sparse.
+const OSM_NAME_QUERIES = {
+  police: (lat, lon, r) => `
+    [out:json][timeout:25];
+    (
+      node["name"~"police|Police|POLICE|thana|Thana|chowki|Chowki",i](around:${r},${lat},${lon});
+      way["name"~"police|Police|POLICE|thana|Thana|chowki|Chowki",i](around:${r},${lat},${lon});
+    );
+    out center;`,
+
+  hospital: (lat, lon, r) => `
+    [out:json][timeout:25];
+    (
+      node["name"~"hospital|Hospital|clinic|Clinic|nursing|Nursing|medical|Medical|health|Health|PHC|CHC|dispensary|Dispensary|maternity|Maternity",i](around:${r},${lat},${lon});
+      way["name"~"hospital|Hospital|clinic|Clinic|nursing|Nursing|medical|Medical|health|Health|PHC|CHC|dispensary|Dispensary|maternity|Maternity",i](around:${r},${lat},${lon});
+    );
+    out center;`,
+
+  towing: (lat, lon, r) => `
+    [out:json][timeout:25];
+    (
+      node["name"~"towing|Towing|crane|Crane|recovery|Recovery|breakdown|Breakdown|vehicle rescue|garage|Garage|auto repair|Auto Repair|workshop|Workshop|mechanic|Mechanic",i](around:${r},${lat},${lon});
+      way["name"~"towing|Towing|crane|Crane|recovery|Recovery|breakdown|Breakdown|vehicle rescue|garage|Garage|auto repair|Auto Repair|workshop|Workshop|mechanic|Mechanic",i](around:${r},${lat},${lon});
+    );
+    out center;`,
+
+  puncture: (lat, lon, r) => `
+    [out:json][timeout:25];
+    (
+      node["name"~"puncture|Puncture|tyre|Tyre|tire|Tire|wheel|Wheel|tube|Tube|vulcanizing|Vulcanizing|tires|Tires",i](around:${r},${lat},${lon});
+      way["name"~"puncture|Puncture|tyre|Tyre|tire|Tire|wheel|Wheel|tube|Tube|vulcanizing|Vulcanizing|tires|Tires",i](around:${r},${lat},${lon});
+    );
+    out center;`,
+
+  showroom: (lat, lon, r) => `
+    [out:json][timeout:25];
+    (
+      node["name"~"showroom|Showroom|motors|Motors|automobile|Automobile|auto|Auto|dealer|Dealer|Hero|Honda|Bajaj|TVS|Suzuki|Yamaha|Royal Enfield|Maruti|Hyundai|Tata|Mahindra|KIA|Toyota|Ford|Volkswagen",i](around:${r},${lat},${lon});
+      way["name"~"showroom|Showroom|motors|Motors|automobile|Automobile|auto|Auto|dealer|Dealer|Hero|Honda|Bajaj|TVS|Suzuki|Yamaha|Royal Enfield|Maruti|Hyundai|Tata|Mahindra|KIA|Toyota|Ford|Volkswagen",i](around:${r},${lat},${lon});
     );
     out center;`,
 };
@@ -142,9 +181,9 @@ function haversine(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
-// IndexedDB offline cache
+// ─── IndexedDB cache ─────────────────────────────────────────────────────────
 const DB_NAME = 'roadsos_cache';
-const DB_VER = 1;
+const DB_VER  = 1;
 
 function openDB() {
   return new Promise((res, rej) => {
@@ -156,18 +195,18 @@ function openDB() {
       }
     };
     req.onsuccess = e => res(e.target.result);
-    req.onerror = () => rej(req.error);
+    req.onerror   = () => rej(req.error);
   });
 }
 
 async function cacheGet(key) {
   try {
     const db = await openDB();
-    return new Promise((res) => {
-      const tx = db.transaction('services', 'readonly');
+    return new Promise(res => {
+      const tx  = db.transaction('services', 'readonly');
       const req = tx.objectStore('services').get(key);
       req.onsuccess = () => res(req.result || null);
-      req.onerror = () => res(null);
+      req.onerror   = () => res(null);
     });
   } catch { return null; }
 }
@@ -175,7 +214,7 @@ async function cacheGet(key) {
 async function cacheSet(key, data) {
   try {
     const db = await openDB();
-    return new Promise((res) => {
+    return new Promise(res => {
       const tx = db.transaction('services', 'readwrite');
       tx.objectStore('services').put({ cacheKey: key, data, ts: Date.now() });
       tx.oncomplete = () => res();
@@ -183,38 +222,16 @@ async function cacheSet(key, data) {
   } catch { }
 }
 
-// FIX: Cache key now includes radius so expanding search always fetches fresh
-async function fetchOSM(lat, lon, type, radius = 10000) {
-  const roundedLat = Math.round(lat * 100) / 100;
-  const roundedLon = Math.round(lon * 100) / 100;
-  const cacheKey = `${type}_${roundedLat}_${roundedLon}_r${radius}`;
-  const cached = await cacheGet(cacheKey);
-  const CACHE_TTL = 30 * 60 * 1000; // 30 min
-
-  if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
-    return cached.data;
-  }
-
-  const query = OSM_QUERIES[type](lat, lon, radius);
-  const resp = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
-
-  if (!resp.ok) throw new Error(`Overpass API error: ${resp.status}`);
-
-  const json = await resp.json();
-
+// ─── Parse raw Overpass elements into place objects ──────────────────────────
+function parseElements(elements, type, userLat, userLon) {
+  const seen   = new Set();
   const places = [];
-  const seen = new Set();
 
-  for (const el of (json.elements || [])) {
+  for (const el of (elements || [])) {
     const elat = el.lat ?? el.center?.lat;
     const elon = el.lon ?? el.center?.lon;
     if (!elat || !elon) continue;
 
-    // Deduplicate by rounded coordinates
     const dedupeKey = `${Math.round(elat * 1000)}_${Math.round(elon * 1000)}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -224,7 +241,6 @@ async function fetchOSM(lat, lon, type, radius = 10000) {
       || tags['name:en']
       || tags['name:te']
       || tags['name:hi']
-      || tags['name:ar']
       || tags['operator']
       || `${type.charAt(0).toUpperCase() + type.slice(1)} Service`;
 
@@ -243,20 +259,15 @@ async function fetchOSM(lat, lon, type, radius = 10000) {
       tags['addr:state'],
     ].filter(Boolean).join(', ');
 
-    const dist = haversine(lat, lon, elat, elon);
-
-    // Determine a label describing the type of place
-    const shopType = tags.shop || tags.amenity || tags.craft || tags.service || '';
-    const typeLabel = shopType
-      ? shopType.replace(/_/g, ' ')
-      : '';
+    const shopType = tags.shop || tags.amenity || tags.craft || tags.service || tags.healthcare || '';
+    const typeLabel = shopType ? shopType.replace(/_/g, ' ') : '';
 
     places.push({
       name,
       phone,
       address,
       typeLabel,
-      dist: parseFloat(dist),
+      dist: parseFloat(haversine(userLat, userLon, elat, elon)),
       lat: elat,
       lon: elon,
       mapsUrl: `https://maps.google.com/?q=${elat},${elon}`,
@@ -264,12 +275,65 @@ async function fetchOSM(lat, lon, type, radius = 10000) {
     });
   }
 
+  return places;
+}
+
+// ─── Single Overpass fetch helper ────────────────────────────────────────────
+async function overpassFetch(query) {
+  // Try primary, fall back to mirror if it fails
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, {
+        method:  'POST',
+        body:    `data=${encodeURIComponent(query)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      return json.elements || [];
+    } catch {
+      // try next endpoint
+    }
+  }
+  throw new Error('Overpass API unavailable. Check internet connection.');
+}
+
+// ─── Main fetch: runs TAG query + NAME query in parallel, merges results ─────
+async function fetchOSM(lat, lon, type, radius = 10000) {
+  const roundedLat = Math.round(lat * 100) / 100;
+  const roundedLon = Math.round(lon * 100) / 100;
+  const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${radius}`;
+  const CACHE_TTL  = 30 * 60 * 1000; // 30 min
+
+  const cached = await cacheGet(cacheKey);
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
+    return cached.data;
+  }
+
+  // Run both tag-based and name-based queries in parallel
+  const [tagElements, nameElements] = await Promise.all([
+    overpassFetch(OSM_TAG_QUERIES[type](lat, lon, radius)),
+    overpassFetch(OSM_NAME_QUERIES[type](lat, lon, radius)),
+  ]);
+
+  // Merge & parse, deduplication handled inside parseElements
+  const allElements = [...tagElements, ...nameElements];
+  const places = parseElements(allElements, type, lat, lon);
+
+  // Sort by distance, take top 15
   places.sort((a, b) => a.dist - b.dist);
-  const top = places.slice(0, 10);
+  const top = places.slice(0, 15);
+
   await cacheSet(cacheKey, top);
   return top;
 }
 
+// ─── ServiceCard component ────────────────────────────────────────────────────
 function ServiceCard({ place, svcType, index }) {
   const svc = SERVICE_TYPES.find(s => s.key === svcType);
   return (
@@ -318,27 +382,23 @@ function ServiceCard({ place, svcType, index }) {
     </div>
   );
 }
-// Current:
 
-
-// Change to:
+// ─── Main Panel ───────────────────────────────────────────────────────────────
 export default function NearbyServicesPanel({ location, apiUrl }) {
-
-  const [activeType, setActiveType]   = useState('police');
-  const [results, setResults]         = useState({});
-  const [loading, setLoading]         = useState({});
-  const [errors, setErrors]           = useState({});
-  const [isOffline, setIsOffline]     = useState(!navigator.onLine);
-  // Radius state — default 10 km, user can increase
-  const [radius, setRadius]           = useState(10000);
+  const [activeType, setActiveType] = useState('police');
+  const [results,    setResults]    = useState({});
+  const [loading,    setLoading]    = useState({});
+  const [errors,     setErrors]     = useState({});
+  const [isOffline,  setIsOffline]  = useState(!navigator.onLine);
+  const [radius,     setRadius]     = useState(10000);
 
   useEffect(() => {
     const onOnline  = () => setIsOffline(false);
     const onOffline = () => setIsOffline(true);
-    window.addEventListener('online', onOnline);
+    window.addEventListener('online',  onOnline);
     window.addEventListener('offline', onOffline);
     return () => {
-      window.removeEventListener('online', onOnline);
+      window.removeEventListener('online',  onOnline);
       window.removeEventListener('offline', onOffline);
     };
   }, []);
@@ -347,19 +407,20 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
     if (!location) return;
 
     setLoading(prev => ({ ...prev, [type]: true }));
-    setErrors(prev => ({ ...prev, [type]: null }));
+    setErrors( prev => ({ ...prev, [type]: null }));
 
     try {
       const data = await fetchOSM(location.lat, location.lon, type, r);
       setResults(prev => ({ ...prev, [type]: data }));
     } catch (e) {
+      // Try serving stale cache on error
       const roundedLat = Math.round(location.lat * 100) / 100;
       const roundedLon = Math.round(location.lon * 100) / 100;
-      const cacheKey = `${type}_${roundedLat}_${roundedLon}_r${r}`;
-      const cached = await cacheGet(cacheKey);
+      const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${r}`;
+      const cached     = await cacheGet(cacheKey);
       if (cached) {
         setResults(prev => ({ ...prev, [type]: cached.data }));
-        setErrors(prev => ({ ...prev, [type]: '⚠️ Showing cached data (offline)' }));
+        setErrors( prev => ({ ...prev, [type]: '⚠️ Showing cached data (offline)' }));
       } else {
         setErrors(prev => ({ ...prev, [type]: `Failed to load. ${e.message || 'Check internet connection.'}` }));
       }
@@ -371,7 +432,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
   // Fetch when tab or radius changes
   useEffect(() => {
     if (location) {
-      // Clear current results so fresh fetch runs
       setResults(prev => ({ ...prev, [activeType]: undefined }));
       fetchServices(activeType, radius);
     }
@@ -385,14 +445,13 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
 
   const handleRadiusChange = (newRadius) => {
     setRadius(newRadius);
-    // Clear result for active type so it re-fetches with new radius
     setResults(prev => ({ ...prev, [activeType]: undefined }));
   };
 
-  const activeSvc      = SERVICE_TYPES.find(s => s.key === activeType);
-  const activeResults  = results[activeType] || [];
-  const isLoading      = loading[activeType];
-  const error          = errors[activeType];
+  const activeSvc     = SERVICE_TYPES.find(s => s.key === activeType);
+  const activeResults = results[activeType] || [];
+  const isLoading     = loading[activeType];
+  const error         = errors[activeType];
 
   return (
     <div className="nearby-services-panel">
