@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+*.egg/
+dist/
+build/
+.venv/
+venv/
+.env/
+
+# Node / React
+node_modules/
+build/
+coverage/
+*.log
+.env.*
+
+# Docker
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.tmp
+*.swp
+
