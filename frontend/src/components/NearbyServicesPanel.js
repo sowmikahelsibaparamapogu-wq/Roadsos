@@ -318,8 +318,12 @@ function ServiceCard({ place, svcType, index }) {
     </div>
   );
 }
+// Current:
 
-export default function NearbyServicesPanel({ location }) {
+
+// Change to:
+export default function NearbyServicesPanel({ location, apiUrl }) {
+
   const [activeType, setActiveType]   = useState('police');
   const [results, setResults]         = useState({});
   const [loading, setLoading]         = useState({});
