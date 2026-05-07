@@ -187,7 +187,8 @@ export default function App() {
       <main className="main">
         {activeTab === 'chat' && <ChatPanel sessionId={sessionId} location={location} hospitals={hospitals} apiUrl={API} />}
         {activeTab === 'hospitals' && <HospitalPanel hospitals={hospitals} loading={hospitalsLoading} location={location} onRefresh={() => location && fetchHospitals(location.lat, location.lon)} />}
-        {activeTab === 'services' && <NearbyServicesPanel location={location} />}
+   
+{activeTab === 'services' && <NearbyServicesPanel location={location} apiUrl={API} />}
       </main>
 
       {sosOpen && <SOSPanel location={location} address={address} hospitals={hospitals} apiUrl={API} onClose={() => setSosOpen(false)} />}
