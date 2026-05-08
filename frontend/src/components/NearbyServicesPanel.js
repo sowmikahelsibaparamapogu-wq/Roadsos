@@ -48,7 +48,6 @@ const SERVICE_TYPES = [
   },
 ];
 
-// Radius options in metres
 const RADIUS_OPTIONS = [
   { label: '5 km',   value: 5000   },
   { label: '10 km',  value: 10000  },
@@ -57,7 +56,14 @@ const RADIUS_OPTIONS = [
   { label: '100 km', value: 100000 },
 ];
 
-// ─── TAG-BASED queries (standard OSM tagging) ───────────────────────────────
+// ─── Direct Overpass endpoints (no proxy needed) ──────────────────────────────
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
+];
+
 const OSM_TAG_QUERIES = {
   police: (lat, lon, r) => `
     [out:json][timeout:25];
@@ -126,7 +132,6 @@ const OSM_TAG_QUERIES = {
     out center;`,
 };
 
-// ─── NAME-KEYWORD queries (catches Indian shops tagged only with a name) ─────
 const OSM_NAME_QUERIES = {
   police: (lat, lon, r) => `
     [out:json][timeout:25];
@@ -179,7 +184,7 @@ function haversine(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
-// ─── IndexedDB cache ─────────────────────────────────────────────────────────
+// ─── IndexedDB cache ──────────────────────────────────────────────────────────
 const DB_NAME = 'roadsos_cache';
 const DB_VER  = 1;
 
@@ -220,7 +225,7 @@ async function cacheSet(key, data) {
   } catch { }
 }
 
-// ─── Parse raw Overpass elements into place objects ──────────────────────────
+// ─── Parse raw Overpass elements ─────────────────────────────────────────────
 function parseElements(elements, type, userLat, userLon) {
   const seen   = new Set();
   const places = [];
@@ -276,45 +281,51 @@ function parseElements(elements, type, userLat, userLon) {
   return places;
 }
 
-// ─── FIXED: Single Overpass fetch via backend proxy (fixes CORS) ─────────────
+// ─── Direct browser fetch — tries each endpoint until one works ───────────────
 async function overpassFetch(query) {
-  try {
-    const resp = await fetch('/api/overpass', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    if (!resp.ok) throw new Error(`Proxy error: ${resp.status}`);
-    const json = await resp.json();
-    return json.elements || [];
-  } catch (e) {
-    throw new Error('Overpass API unavailable. Check internet connection.');
+  // Cap radius to 25km to avoid timeouts
+  const safeQuery = query.replace(/\(around:(\d+)/g, (match, radius) => {
+    return `(around:${Math.min(parseInt(radius), 25000)}`;
+  });
+
+  for (const url of OVERPASS_ENDPOINTS) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        body: `data=${encodeURIComponent(safeQuery)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      return json.elements || [];
+    } catch {
+      continue;
+    }
   }
+
+  throw new Error('Overpass API unavailable. Check internet connection.');
 }
 
-// ─── Main fetch: runs TAG query + NAME query in parallel, merges results ─────
+// ─── Main fetch: TAG + NAME queries in parallel, merged ───────────────────────
 async function fetchOSM(lat, lon, type, radius = 10000) {
   const roundedLat = Math.round(lat * 100) / 100;
   const roundedLon = Math.round(lon * 100) / 100;
   const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${radius}`;
-  const CACHE_TTL  = 30 * 60 * 1000; // 30 min
+  const CACHE_TTL  = 30 * 60 * 1000;
 
   const cached = await cacheGet(cacheKey);
   if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
     return cached.data;
   }
 
-  // Run both tag-based and name-based queries in parallel
   const [tagElements, nameElements] = await Promise.all([
     overpassFetch(OSM_TAG_QUERIES[type](lat, lon, radius)),
     overpassFetch(OSM_NAME_QUERIES[type](lat, lon, radius)),
   ]);
 
-  // Merge & parse, deduplication handled inside parseElements
   const allElements = [...tagElements, ...nameElements];
   const places = parseElements(allElements, type, lat, lon);
-
-  // Sort by distance, take top 15
   places.sort((a, b) => a.dist - b.dist);
   const top = places.slice(0, 15);
 
@@ -322,7 +333,7 @@ async function fetchOSM(lat, lon, type, radius = 10000) {
   return top;
 }
 
-// ─── ServiceCard component ────────────────────────────────────────────────────
+// ─── ServiceCard ──────────────────────────────────────────────────────────────
 function ServiceCard({ place, svcType, index }) {
   const svc = SERVICE_TYPES.find(s => s.key === svcType);
   return (
@@ -345,7 +356,7 @@ function ServiceCard({ place, svcType, index }) {
       {place.address && <div className="svc-card-addr">📍 {place.address}</div>}
       <div className="svc-card-actions">
         {place.phone ? (
-          <a
+          
             className="svc-btn svc-btn-call"
             href={`tel:${place.phone}`}
             style={{ background: svc.color + '22', borderColor: svc.color + '55', color: svc.color }}
@@ -353,7 +364,7 @@ function ServiceCard({ place, svcType, index }) {
             📞 Call
           </a>
         ) : svc.emergency ? (
-          <a
+          
             className="svc-btn svc-btn-call"
             href={`tel:${svc.emergency}`}
             style={{ background: svc.color + '22', borderColor: svc.color + '55', color: svc.color }}
@@ -402,7 +413,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
       const data = await fetchOSM(location.lat, location.lon, type, r);
       setResults(prev => ({ ...prev, [type]: data }));
     } catch (e) {
-      // Try serving stale cache on error
       const roundedLat = Math.round(location.lat * 100) / 100;
       const roundedLon = Math.round(location.lon * 100) / 100;
       const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${r}`;
@@ -418,7 +428,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
     }
   }, [location]);
 
-  // Fetch when tab or radius changes
   useEffect(() => {
     if (location) {
       setResults(prev => ({ ...prev, [activeType]: undefined }));
@@ -444,7 +453,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
 
   return (
     <div className="nearby-services-panel">
-      {/* Offline Banner */}
       {isOffline && (
         <div className="offline-banner">
           📡 You're offline — showing cached data where available
