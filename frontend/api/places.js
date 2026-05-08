@@ -5,30 +5,14 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { query } = req.body;
-    if (!query) return res.status(400).json({ error: 'Query required' });
+    const { lat, lon, keyword, radius } = req.body;
+    const key = process.env.GOOGLE_PLACES_KEY;
+    if (!key) return res.status(500).json({ error: 'API key not configured' });
 
-    const endpoints = [
-      'https://overpass-api.de/api/interpreter',
-      'https://overpass.kumi.systems/api/interpreter',
-      'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-    ];
-
-    for (const url of endpoints) {
-      try {
-        const resp = await fetch(url, {
-          method: 'POST',
-          body: `data=${encodeURIComponent(query)}`,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          signal: AbortSignal.timeout(12000),
-        });
-        if (!resp.ok) continue;
-        const json = await resp.json();
-        return res.status(200).json(json);
-      } catch { continue; }
-    }
-
-    return res.status(503).json({ error: 'Overpass API unavailable' });
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${key}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    return res.status(200).json(data);
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
