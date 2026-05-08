@@ -9,6 +9,8 @@ const SERVICE_TYPES = [
     bg: '#1e3a5f',
     emergency: '100',
     description: 'Nearest police stations',
+    googleKeywords: ['police station'],
+    googleTypes: ['police'],
   },
   {
     key: 'hospital',
@@ -18,6 +20,8 @@ const SERVICE_TYPES = [
     bg: '#5f1e1e',
     emergency: '108',
     description: 'Emergency medical services',
+    googleKeywords: ['hospital', 'clinic'],
+    googleTypes: ['hospital'],
   },
   {
     key: 'towing',
@@ -27,6 +31,8 @@ const SERVICE_TYPES = [
     bg: '#5f3e1e',
     emergency: null,
     description: 'Vehicle towing & recovery',
+    googleKeywords: ['towing service', 'car repair garage'],
+    googleTypes: ['car_repair'],
   },
   {
     key: 'puncture',
@@ -36,6 +42,8 @@ const SERVICE_TYPES = [
     bg: '#1e3d2f',
     emergency: null,
     description: 'Tyre puncture repair shops',
+    googleKeywords: ['puncture shop', 'tyre shop', 'tire repair'],
+    googleTypes: ['car_repair'],
   },
   {
     key: 'showroom',
@@ -45,6 +53,8 @@ const SERVICE_TYPES = [
     bg: '#2d1e5f',
     emergency: null,
     description: 'Nearest car/bike showrooms',
+    googleKeywords: ['car showroom', 'bike showroom', 'automobile dealer'],
+    googleTypes: ['car_dealer'],
   },
 ];
 
@@ -55,124 +65,6 @@ const RADIUS_OPTIONS = [
   { label: '50 km',  value: 50000  },
   { label: '100 km', value: 100000 },
 ];
-
-// ─── Direct Overpass endpoints (no proxy needed) ──────────────────────────────
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-  'https://overpass.openstreetmap.ru/api/interpreter',
-];
-
-const OSM_TAG_QUERIES = {
-  police: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["amenity"="police"](around:${r},${lat},${lon});
-      way["amenity"="police"](around:${r},${lat},${lon});
-      relation["amenity"="police"](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  hospital: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["amenity"="hospital"](around:${r},${lat},${lon});
-      way["amenity"="hospital"](around:${r},${lat},${lon});
-      node["amenity"="clinic"](around:${r},${lat},${lon});
-      way["amenity"="clinic"](around:${r},${lat},${lon});
-      node["amenity"="doctors"](around:${r},${lat},${lon});
-      node["emergency"="ambulance_station"](around:${r},${lat},${lon});
-      node["healthcare"="hospital"](around:${r},${lat},${lon});
-      way["healthcare"="hospital"](around:${r},${lat},${lon});
-      node["healthcare"="clinic"](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  towing: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["service"~"towing|vehicle_rescue|breakdown"](around:${r},${lat},${lon});
-      way["service"~"towing|vehicle_rescue|breakdown"](around:${r},${lat},${lon});
-      node["amenity"="vehicle_rescue"](around:${r},${lat},${lon});
-      node["emergency"="towing"](around:${r},${lat},${lon});
-      node["shop"="car_repair"](around:${r},${lat},${lon});
-      way["shop"="car_repair"](around:${r},${lat},${lon});
-      node["craft"="car_repair"](around:${r},${lat},${lon});
-      node["amenity"="car_repair"](around:${r},${lat},${lon});
-      node["highway"="services"](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  puncture: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["shop"="tyres"](around:${r},${lat},${lon});
-      way["shop"="tyres"](around:${r},${lat},${lon});
-      node["shop"="tyre"](around:${r},${lat},${lon});
-      node["shop"="tire"](around:${r},${lat},${lon});
-      node["craft"="tyre_repairer"](around:${r},${lat},${lon});
-      node["shop"="car_repair"](around:${r},${lat},${lon});
-      way["shop"="car_repair"](around:${r},${lat},${lon});
-      node["craft"="car_repair"](around:${r},${lat},${lon});
-      node["amenity"="car_repair"](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  showroom: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["shop"="car"](around:${r},${lat},${lon});
-      way["shop"="car"](around:${r},${lat},${lon});
-      node["shop"="motorcycle"](around:${r},${lat},${lon});
-      way["shop"="motorcycle"](around:${r},${lat},${lon});
-      node["shop"="car_parts"](around:${r},${lat},${lon});
-      node["amenity"="car_rental"](around:${r},${lat},${lon});
-    );
-    out center;`,
-};
-
-const OSM_NAME_QUERIES = {
-  police: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["name"~"police|Police|POLICE|thana|Thana|chowki|Chowki",i](around:${r},${lat},${lon});
-      way["name"~"police|Police|POLICE|thana|Thana|chowki|Chowki",i](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  hospital: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["name"~"hospital|Hospital|clinic|Clinic|nursing|Nursing|medical|Medical|health|Health|PHC|CHC|dispensary|Dispensary|maternity|Maternity",i](around:${r},${lat},${lon});
-      way["name"~"hospital|Hospital|clinic|Clinic|nursing|Nursing|medical|Medical|health|Health|PHC|CHC|dispensary|Dispensary|maternity|Maternity",i](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  towing: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["name"~"towing|Towing|crane|Crane|recovery|Recovery|breakdown|Breakdown|vehicle rescue|garage|Garage|auto repair|Auto Repair|workshop|Workshop|mechanic|Mechanic",i](around:${r},${lat},${lon});
-      way["name"~"towing|Towing|crane|Crane|recovery|Recovery|breakdown|Breakdown|vehicle rescue|garage|Garage|auto repair|Auto Repair|workshop|Workshop|mechanic|Mechanic",i](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  puncture: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["name"~"puncture|Puncture|tyre|Tyre|tire|Tire|wheel|Wheel|tube|Tube|vulcanizing|Vulcanizing|tires|Tires",i](around:${r},${lat},${lon});
-      way["name"~"puncture|Puncture|tyre|Tyre|tire|Tire|wheel|Wheel|tube|Tube|vulcanizing|Vulcanizing|tires|Tires",i](around:${r},${lat},${lon});
-    );
-    out center;`,
-
-  showroom: (lat, lon, r) => `
-    [out:json][timeout:25];
-    (
-      node["name"~"showroom|Showroom|motors|Motors|automobile|Automobile|auto|Auto|dealer|Dealer|Hero|Honda|Bajaj|TVS|Suzuki|Yamaha|Royal Enfield|Maruti|Hyundai|Tata|Mahindra|KIA|Toyota|Ford|Volkswagen",i](around:${r},${lat},${lon});
-      way["name"~"showroom|Showroom|motors|Motors|automobile|Automobile|auto|Auto|dealer|Dealer|Hero|Honda|Bajaj|TVS|Suzuki|Yamaha|Royal Enfield|Maruti|Hyundai|Tata|Mahindra|KIA|Toyota|Ford|Volkswagen",i](around:${r},${lat},${lon});
-    );
-    out center;`,
-};
 
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -225,93 +117,23 @@ async function cacheSet(key, data) {
   } catch { }
 }
 
-// ─── Parse raw Overpass elements ─────────────────────────────────────────────
-function parseElements(elements, type, userLat, userLon) {
-  const seen   = new Set();
-  const places = [];
-
-  for (const el of (elements || [])) {
-    const elat = el.lat ?? el.center?.lat;
-    const elon = el.lon ?? el.center?.lon;
-    if (!elat || !elon) continue;
-
-    const dedupeKey = `${Math.round(elat * 1000)}_${Math.round(elon * 1000)}`;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-
-    const tags = el.tags || {};
-    const name = tags.name
-      || tags['name:en']
-      || tags['name:te']
-      || tags['name:hi']
-      || tags['operator']
-      || `${type.charAt(0).toUpperCase() + type.slice(1)} Service`;
-
-    const phone = tags.phone
-      || tags.telephone
-      || tags['contact:phone']
-      || tags['contact:mobile']
-      || tags['contact:telephone']
-      || tags['phone:mobile']
-      || '';
-
-    const address = [
-      tags['addr:housenumber'],
-      tags['addr:street'],
-      tags['addr:city'],
-      tags['addr:state'],
-    ].filter(Boolean).join(', ');
-
-    const shopType = tags.shop || tags.amenity || tags.craft || tags.service || tags.healthcare || '';
-    const typeLabel = shopType ? shopType.replace(/_/g, ' ') : '';
-
-    places.push({
-      name,
-      phone,
-      address,
-      typeLabel,
-      dist: parseFloat(haversine(userLat, userLon, elat, elon)),
-      lat: elat,
-      lon: elon,
-      mapsUrl: `https://maps.google.com/?q=${elat},${elon}`,
-      wazeUrl: `https://waze.com/ul?ll=${elat},${elon}&navigate=yes`,
-    });
-  }
-
-  return places;
-}
-
-// ─── Direct browser fetch — tries each endpoint until one works ───────────────
-async function overpassFetch(query) {
-  // Cap radius to 25km to avoid timeouts
-  const safeQuery = query.replace(/\(around:(\d+)/g, (match, radius) => {
-    return `(around:${Math.min(parseInt(radius), 25000)}`;
+// ─── Google Places fetch via Vercel proxy ─────────────────────────────────────
+async function googlePlacesFetch(lat, lon, keyword, radius) {
+  const safeRadius = Math.min(radius, 50000);
+  const resp = await fetch('/api/places', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat, lon, keyword, radius: safeRadius }),
   });
-
-  for (const url of OVERPASS_ENDPOINTS) {
-    try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(safeQuery)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!resp.ok) continue;
-      const json = await resp.json();
-      return json.elements || [];
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error('Overpass API unavailable. Check internet connection.');
+  if (!resp.ok) throw new Error(`Places API error: ${resp.status}`);
+  return await resp.json();
 }
 
-// ─── Main fetch: TAG + NAME queries in parallel, merged ───────────────────────
-async function fetchOSM(lat, lon, type, radius = 10000) {
+// ─── Fetch all keywords for a service type ────────────────────────────────────
+async function fetchPlaces(lat, lon, type, radius = 10000) {
   const roundedLat = Math.round(lat * 100) / 100;
   const roundedLon = Math.round(lon * 100) / 100;
-  const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${radius}`;
+  const cacheKey   = `gp_${type}_${roundedLat}_${roundedLon}_r${radius}`;
   const CACHE_TTL  = 30 * 60 * 1000;
 
   const cached = await cacheGet(cacheKey);
@@ -319,15 +141,46 @@ async function fetchOSM(lat, lon, type, radius = 10000) {
     return cached.data;
   }
 
-  const [tagElements, nameElements] = await Promise.all([
-    overpassFetch(OSM_TAG_QUERIES[type](lat, lon, radius)),
-    overpassFetch(OSM_NAME_QUERIES[type](lat, lon, radius)),
-  ]);
+  const svc = SERVICE_TYPES.find(s => s.key === type);
+  const seen = new Set();
+  const allPlaces = [];
 
-  const allElements = [...tagElements, ...nameElements];
-  const places = parseElements(allElements, type, lat, lon);
-  places.sort((a, b) => a.dist - b.dist);
-  const top = places.slice(0, 15);
+  // Fetch all keywords in parallel
+  const results = await Promise.allSettled(
+    svc.googleKeywords.map(kw => googlePlacesFetch(lat, lon, kw, radius))
+  );
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    const places = result.value.results || result.value || [];
+
+    for (const place of places) {
+      const plat = place.geometry?.location?.lat;
+      const plon = place.geometry?.location?.lng;
+      if (!plat || !plon) continue;
+
+      const dedupeKey = place.place_id || `${Math.round(plat * 1000)}_${Math.round(plon * 1000)}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
+      allPlaces.push({
+        name: place.name || 'Unknown',
+        phone: place.formatted_phone_number || '',
+        address: place.vicinity || place.formatted_address || '',
+        typeLabel: place.types?.[0]?.replace(/_/g, ' ') || '',
+        dist: parseFloat(haversine(lat, lon, plat, plon)),
+        lat: plat,
+        lon: plon,
+        rating: place.rating || null,
+        mapsUrl: `https://maps.google.com/?q=${plat},${plon}`,
+        wazeUrl: `https://waze.com/ul?ll=${plat},${plon}&navigate=yes`,
+        googleMapsUrl: place.url || `https://maps.google.com/?q=${plat},${plon}`,
+      });
+    }
+  }
+
+  allPlaces.sort((a, b) => a.dist - b.dist);
+  const top = allPlaces.slice(0, 15);
 
   await cacheSet(cacheKey, top);
   return top;
@@ -351,6 +204,11 @@ function ServiceCard({ place, svcType, index }) {
       {place.typeLabel && (
         <div className="svc-card-type" style={{ color: svc.color + 'aa', fontSize: '0.72rem', marginBottom: 2 }}>
           {place.typeLabel}
+        </div>
+      )}
+      {place.rating && (
+        <div className="svc-card-type" style={{ color: '#f59e0b', fontSize: '0.72rem', marginBottom: 2 }}>
+          ⭐ {place.rating}
         </div>
       )}
       {place.address && <div className="svc-card-addr">📍 {place.address}</div>}
@@ -405,17 +263,15 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
 
   const fetchServices = useCallback(async (type, r) => {
     if (!location) return;
-
     setLoading(prev => ({ ...prev, [type]: true }));
     setErrors( prev => ({ ...prev, [type]: null }));
-
     try {
-      const data = await fetchOSM(location.lat, location.lon, type, r);
+      const data = await fetchPlaces(location.lat, location.lon, type, r);
       setResults(prev => ({ ...prev, [type]: data }));
     } catch (e) {
       const roundedLat = Math.round(location.lat * 100) / 100;
       const roundedLon = Math.round(location.lon * 100) / 100;
-      const cacheKey   = `${type}_${roundedLat}_${roundedLon}_r${r}`;
+      const cacheKey   = `gp_${type}_${roundedLat}_${roundedLon}_r${r}`;
       const cached     = await cacheGet(cacheKey);
       if (cached) {
         setResults(prev => ({ ...prev, [type]: cached.data }));
@@ -459,7 +315,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         </div>
       )}
 
-      {/* Service Type Tabs */}
       <div className="svc-type-tabs">
         {SERVICE_TYPES.map(svc => (
           <button
@@ -476,7 +331,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         ))}
       </div>
 
-      {/* Panel Header */}
       <div className="svc-panel-header" style={{ borderColor: activeSvc.color + '44' }}>
         <div>
           <h2 style={{ color: activeSvc.color }}>{activeSvc.icon} {activeSvc.label}</h2>
@@ -485,7 +339,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         <button className="refresh-icon-btn" onClick={handleRefresh} title="Refresh">🔄</button>
       </div>
 
-      {/* Radius Selector */}
       <div className="svc-radius-bar">
         <span className="svc-radius-label">🔍 Search radius:</span>
         <div className="svc-radius-btns">
@@ -504,7 +357,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         </div>
       </div>
 
-      {/* Emergency Quick Call */}
       {activeSvc.emergency && (
         <div className="svc-emergency-bar"
           style={{ background: activeSvc.color + '22', borderColor: activeSvc.color + '55' }}>
@@ -515,7 +367,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         </div>
       )}
 
-      {/* No Location */}
       {!location && (
         <div className="svc-empty">
           <div className="svc-empty-icon">📍</div>
@@ -524,7 +375,6 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         </div>
       )}
 
-      {/* Loading */}
       {location && isLoading && (
         <div className="loading-spinner">
           <div className="spinner" style={{ borderTopColor: activeSvc.color }} />
@@ -532,10 +382,8 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
         </div>
       )}
 
-      {/* Error */}
       {error && <div className="svc-error">{error}</div>}
 
-      {/* Results */}
       {location && !isLoading && activeResults.length > 0 && (
         <div className="svc-results">
           <div className="svc-results-count" style={{ color: activeSvc.color + 'cc' }}>
@@ -545,12 +393,11 @@ export default function NearbyServicesPanel({ location, apiUrl }) {
             <ServiceCard key={i} place={place} svcType={activeType} index={i} />
           ))}
           <div className="svc-footer">
-            <span>📡 Data from OpenStreetMap · Works globally</span>
+            <span>📡 Data from Google Places · Works in India</span>
           </div>
         </div>
       )}
 
-      {/* No Results */}
       {location && !isLoading && !error && activeResults.length === 0 && (
         <div className="svc-empty">
           <div className="svc-empty-icon">{activeSvc.icon}</div>
