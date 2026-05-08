@@ -9,7 +9,29 @@ export default async function handler(req, res) {
     const key = process.env.FOURSQUARE_API_KEY;
     if (!key) return res.status(500).json({ error: 'API key not configured' });
 
-    const url = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(keyword)}&ll=${lat},${lon}&radius=${Math.min(radius, 100000)}&limit=15&fields=name,location,geocodes,categories,distance,tel`;
+    // Map keywords to Foursquare category IDs for better results in India
+    const categoryMap = {
+      'police station': '19050',        // Police Station
+      'hospital': '15014',              // Hospital
+      'clinic': '15014',
+      'towing service': '11134',        // Automotive Shop
+      'car repair garage': '11134',
+      'puncture shop': '11134',
+      'tyre shop': '11134',
+      'tire repair': '11134',
+      'car showroom': '11100',          // Car Dealership
+      'bike showroom': '11100',
+      'automobile dealer': '11100',
+    };
+
+    const categoryId = categoryMap[keyword.toLowerCase()];
+    
+    let url;
+    if (categoryId) {
+      url = `https://api.foursquare.com/v3/places/search?categories=${categoryId}&ll=${lat},${lon}&radius=${Math.min(radius, 100000)}&limit=15&fields=name,location,geocodes,categories,distance,tel,fsq_id`;
+    } else {
+      url = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(keyword)}&ll=${lat},${lon}&radius=${Math.min(radius, 100000)}&limit=15&fields=name,location,geocodes,categories,distance,tel,fsq_id`;
+    }
 
     const resp = await fetch(url, {
       headers: {
@@ -20,10 +42,14 @@ export default async function handler(req, res) {
 
     const data = await resp.json();
 
-    // Convert Foursquare format → Google Places format so NearbyServicesPanel works unchanged
     const results = (data.results || []).map(place => ({
       name: place.name,
-      geometry: { location: { lat: place.geocodes?.main?.latitude, lng: place.geocodes?.main?.longitude } },
+      geometry: {
+        location: {
+          lat: place.geocodes?.main?.latitude,
+          lng: place.geocodes?.main?.longitude
+        }
+      },
       vicinity: [place.location?.address, place.location?.locality].filter(Boolean).join(', '),
       formatted_phone_number: place.tel || '',
       types: place.categories?.map(c => c.name.toLowerCase().replace(/ /g, '_')) || [],
