@@ -76,7 +76,6 @@ function haversine(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
-// ─── IndexedDB cache ──────────────────────────────────────────────────────────
 const DB_NAME = 'roadsos_cache';
 const DB_VER  = 1;
 
@@ -117,7 +116,6 @@ async function cacheSet(key, data) {
   } catch { }
 }
 
-// ─── Google Places fetch via Vercel proxy ─────────────────────────────────────
 async function googlePlacesFetch(lat, lon, keyword, radius) {
   const safeRadius = Math.min(radius, 50000);
   const resp = await fetch('/api/places', {
@@ -129,7 +127,6 @@ async function googlePlacesFetch(lat, lon, keyword, radius) {
   return await resp.json();
 }
 
-// ─── Fetch all keywords for a service type ────────────────────────────────────
 async function fetchPlaces(lat, lon, type, radius = 10000) {
   const roundedLat = Math.round(lat * 100) / 100;
   const roundedLon = Math.round(lon * 100) / 100;
@@ -145,7 +142,6 @@ async function fetchPlaces(lat, lon, type, radius = 10000) {
   const seen = new Set();
   const allPlaces = [];
 
-  // Fetch all keywords in parallel
   const results = await Promise.allSettled(
     svc.googleKeywords.map(kw => googlePlacesFetch(lat, lon, kw, radius))
   );
@@ -174,14 +170,12 @@ async function fetchPlaces(lat, lon, type, radius = 10000) {
         rating: place.rating || null,
         mapsUrl: `https://maps.google.com/?q=${plat},${plon}`,
         wazeUrl: `https://waze.com/ul?ll=${plat},${plon}&navigate=yes`,
-        googleMapsUrl: place.url || `https://maps.google.com/?q=${plat},${plon}`,
       });
     }
   }
 
   allPlaces.sort((a, b) => a.dist - b.dist);
   const top = allPlaces.slice(0, 15);
-
   await cacheSet(cacheKey, top);
   return top;
 }
