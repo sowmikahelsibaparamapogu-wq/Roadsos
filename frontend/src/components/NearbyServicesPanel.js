@@ -58,57 +58,82 @@ async function cacheSet(key, data) {
   } catch {}
 }
 
-async function googlePlacesFetch(lat, lon, keyword, radius) {
-  const resp = await fetch('/api/places', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lon, keyword, radius: Math.min(radius, 50000) }),
-  });
-  if (!resp.ok) throw new Error(`Places API error: ${resp.status}`);
-  return await resp.json();
+function buildOverpassQuery(lat, lon, type, radius) {
+  const r = Math.min(radius, 100000);
+  const around = `(around:${r},${lat},${lon})`;
+  if (type === 'police') {
+    return `[out:json][timeout:25];(node["amenity"="police"]${around};way["amenity"="police"]${around};);out center 20;`;
+  } else if (type === 'hospital') {
+    return `[out:json][timeout:25];(node["amenity"~"hospital|clinic|doctors"]${around};way["amenity"~"hospital|clinic|doctors"]${around};);out center 20;`;
+  } else if (type === 'towing') {
+    return `[out:json][timeout:25];(node["shop"~"car_repair|tyres|vehicle"]${around};way["shop"~"car_repair|tyres|vehicle"]${around};node["amenity"="car_repair"]${around};);out center 20;`;
+  } else if (type === 'puncture') {
+    return `[out:json][timeout:25];(node["shop"~"tyres|car_repair"]${around};way["shop"~"tyres|car_repair"]${around};);out center 20;`;
+  } else if (type === 'showroom') {
+    return `[out:json][timeout:25];(node["shop"~"car|motorcycle|vehicle"]${around};way["shop"~"car|motorcycle|vehicle"]${around};);out center 20;`;
+  }
+  return `[out:json][timeout:25];(node["amenity"="police"]${around};);out center 20;`;
+}
+
+async function fetchOverpassDirect(query) {
+  const servers = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ];
+  for (const server of servers) {
+    try {
+      const resp = await fetch(server, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data.elements) return data.elements;
+    } catch { continue; }
+  }
+  throw new Error('All Overpass servers failed. Check your internet connection.');
 }
 
 async function fetchPlaces(lat, lon, type, radius = 10000) {
   const rLat = Math.round(lat*100)/100, rLon = Math.round(lon*100)/100;
-  const cacheKey = `gp_${type}_${rLat}_${rLon}_r${radius}`;
+  const cacheKey = `osm_${type}_${rLat}_${rLon}_r${radius}`;
 
   const cached = await cacheGet(cacheKey);
   if (cached && (Date.now() - cached.ts) < 30*60*1000) return cached.data;
 
-  const svc = SERVICE_TYPES.find(s => s.key === type);
-  const seen = new Set(), allPlaces = [];
+  const query = buildOverpassQuery(lat, lon, type, radius);
+  const elements = await fetchOverpassDirect(query);
 
-  const results = await Promise.allSettled(
-    svc.googleKeywords.map(kw => googlePlacesFetch(lat, lon, kw, radius))
-  );
+  const places = elements
+    .map(el => {
+      const elat = el.lat ?? el.center?.lat;
+      const elon = el.lon ?? el.center?.lon;
+      if (!elat || !elon) return null;
+      const tags = el.tags || {};
+      const name = tags.name || tags['name:en'] || tags.amenity || tags.shop || 'Unknown';
+      const phone = tags.phone || tags['contact:phone'] || tags['contact:mobile'] || '';
+      const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']]
+        .filter(Boolean).join(', ') || tags['addr:full'] || '';
+      return {
+        name,
+        phone,
+        address,
+        typeLabel: (tags.amenity || tags.shop || '').replace(/_/g, ' '),
+        dist: parseFloat(haversine(lat, lon, elat, elon)),
+        lat: elat, lon: elon,
+        rating: null,
+        mapsUrl: `https://maps.google.com/?q=${elat},${elon}`,
+        wazeUrl: `https://waze.com/ul?ll=${elat},${elon}&navigate=yes`,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 15);
 
-  for (const result of results) {
-    if (result.status !== 'fulfilled') continue;
-    for (const place of (result.value.results || [])) {
-      const plat = place.geometry?.location?.lat;
-      const plon = place.geometry?.location?.lng;
-      if (!plat || !plon) continue;
-      const key = place.place_id || `${Math.round(plat*1000)}_${Math.round(plon*1000)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      allPlaces.push({
-        name: place.name || 'Unknown',
-        phone: place.formatted_phone_number || '',
-        address: place.vicinity || place.formatted_address || '',
-        typeLabel: place.types?.[0]?.replace(/_/g,' ') || '',
-        dist: parseFloat(haversine(lat, lon, plat, plon)),
-        lat: plat, lon: plon,
-        rating: place.rating || null,
-        mapsUrl: `https://maps.google.com/?q=${plat},${plon}`,
-        wazeUrl: `https://waze.com/ul?ll=${plat},${plon}&navigate=yes`,
-      });
-    }
-  }
-
-  allPlaces.sort((a,b) => a.dist - b.dist);
-  const top = allPlaces.slice(0, 15);
-  await cacheSet(cacheKey, top);
-  return top;
+  await cacheSet(cacheKey, places);
+  return places;
 }
 
 function ServiceCard({ place, svcType, index }) {
