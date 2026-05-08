@@ -1,7 +1,6 @@
 {
   "functions": {
-    "api/overpass.js": {
-      "maxDuration": 30
-    }
+    "api/overpass.js": { "maxDuration": 30 },
+    "api/places.js": { "maxDuration": 30 }
   }
 }
