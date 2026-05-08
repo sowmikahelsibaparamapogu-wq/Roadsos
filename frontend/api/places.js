@@ -6,13 +6,32 @@ export default async function handler(req, res) {
 
   try {
     const { lat, lon, keyword, radius } = req.body;
-    const key = process.env.GOOGLE_PLACES_KEY;
+    const key = process.env.FOURSQUARE_API_KEY;
     if (!key) return res.status(500).json({ error: 'API key not configured' });
 
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${key}`;
-    const resp = await fetch(url);
+    const url = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(keyword)}&ll=${lat},${lon}&radius=${Math.min(radius, 100000)}&limit=15&fields=name,location,geocodes,categories,distance,tel`;
+
+    const resp = await fetch(url, {
+      headers: {
+        'Authorization': key,
+        'Accept': 'application/json'
+      }
+    });
+
     const data = await resp.json();
-    return res.status(200).json(data);
+
+    // Convert Foursquare format → Google Places format so NearbyServicesPanel works unchanged
+    const results = (data.results || []).map(place => ({
+      name: place.name,
+      geometry: { location: { lat: place.geocodes?.main?.latitude, lng: place.geocodes?.main?.longitude } },
+      vicinity: [place.location?.address, place.location?.locality].filter(Boolean).join(', '),
+      formatted_phone_number: place.tel || '',
+      types: place.categories?.map(c => c.name.toLowerCase().replace(/ /g, '_')) || [],
+      rating: null,
+      place_id: place.fsq_id,
+    }));
+
+    return res.status(200).json({ results });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
